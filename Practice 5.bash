@@ -36,5 +36,5 @@ ls myfile
 #11 Задание
 nice -n -1 bash
 #12 Задание
-sudo timme nice -n 19 updatedb
-sudo timme nice -n 5 updatedb
+sudo time nice -n 19 updatedb
+sudo time nice -n 5 updatedb
