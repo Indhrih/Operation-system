@@ -1,161 +1,150 @@
 #!/bin/bash
 
-# Переменные для хранения путей лог-файлов
+# Переменные для хранения состояний
+SHOW_USERS=false
+SHOW_PROCESSES=false
 LOG_FILE=""
 ERROR_FILE=""
 
-# Функция для вывода справки
+# Функции для обработки действий
 show_help() {
     cat << EOF
-Usage: $0 [OPTIONS]
+Использование: $0 [ОПЦИИ]
 
-Options:
-    -u, --users       Отображать пользователей и их домашние каталоги, отсортированные в алфавитном порядке.
-    -p, --processes   Отображение запущенных процессов, отсортированных по PID.
-    -l, --log PATH    Перенаправьте выходные данные в указанный файл журнала.
-    -e, --errors PATH Перенаправьте stderr на указанный файл ошибок.
-    -h, --help        Покажите это справочное сообщение и завершите работу.
-
-Examples:
-    $0 -u
-    $0 -p -l /var/log/output.log -e /var/log/errors.log
-EOF
+Опции:
+    -u, --users         Вывести список пользователей и их домашние директории
+    -p, --processes     Вывести список запущенных процессов по PID
+    -h, --help          Показать эту справку и выйти
+    -l PATH, --log PATH Перенаправить вывод в файл PATH
+    -e PATH, --errors PATH Перенаправить stderr в файл PATH
 }
 
-# Функция для вывода пользователей и их домашних директорий
-# Использует getent для получения информации о пользователях
-# cut извлекает имя пользователя и домашнюю директорию
-# sort сортирует результат по алфавиту
 show_users() {
-    getent passwd | cut -d: -f1,6 | sort
+    awk -F: '{print $1 ":" $6}' /etc/passwd | sort
 }
 
-# Функция для вывода процессов, отсортированных по PID
-# ps -e -o pid,ppid,cmd - отображает все процессы с выбранными полями
-# --sort=pid сортирует процессы по идентификатору
 show_processes() {
-    ps -e -o pid,ppid,cmd --sort=pid
+    ps -eo pid,comm --sort=pid
 }
 
-# Функция проверки доступа к файлу
-# Проверяет возможность записи в файл и в родительскую директорию
-# Параметры:
-#   $1 - путь к файлу
-#   $2 - тип файла (для сообщения об ошибке)
-check_file_access() {
-    local file=$1
-    local type=$2
-
-    # Проверяем, существует ли файл и доступен ли он для записи
-    if [[ -e "$file" && ! -w "$file" ]]; then
-        echo "Error: No write permission for $type file '$file'" >&2
-        return 1
-    fi
-
-    # Получаем родительскую директорию файла
-    local dir=$(dirname "$file")
+# Функция проверки доступности пути
+check_path() {
+    local path="$1"
+    local dir=$(dirname "$path")
     
-    # Проверяем доступ на запись в родительскую директорию
-    if [[ ! -w "$dir" ]]; then
-        echo "Error: No write permission for directory '$dir'" >&2
+    if [ ! -d "$dir" ]; then
+        echo "Ошибка: Директория $dir не существует" >&2
         return 1
     fi
-
+    
+    if [ ! -w "$dir" ]; then
+        echo "Ошибка: Нет прав на запись в директорию $dir" >&2
+        return 1
+    fi
+    
     return 0
 }
 
-# Парсинг аргументов командной строки с использованием getopt
-# -o определяет короткие опции (u,p,l:,e:,h)
-# --long определяет длинные опции
-# -n "$0" - имя программы для сообщений об ошибках
-# -- "$@" - передача всех аргументов командной строки
-TEMP=$(getopt -o upl:e:h --long users,processes,log:,errors:,help -n "$0" -- "$@")
-
-# Проверяем успешность парсинга аргументов
-if [ $? -ne 0 ]; then
-    show_help
-    exit 1
-fi
-
-# eval set -- обрабатывает результат getopt
-eval set -- "$TEMP"
-
-# Инициализируем флаги команд
-CMD_USERS=0
-CMD_PROCESSES=0
-
-# Обработка аргументов в цикле
-while true; do
-    case "$1" in
-        -u|--users)
-            CMD_USERS=1  # Устанавливаем флаг вывода пользователей
-            shift
+# Используем getopts для обработки коротких опций
+while getopts ":uphl:e:-:" opt; do
+    case $opt in
+        u)
+            SHOW_USERS=true
             ;;
-        -p|--processes)
-            CMD_PROCESSES=1  # Устанавливаем флаг вывода процессов
-            shift
+        p)
+            SHOW_PROCESSES=true
             ;;
-        -l|--log)
-            LOG_FILE="$2"  # Сохраняем путь для лог-файла
-            shift 2  # Сдвигаем на 2 позиции (опция + значение)
+        h)
+            show_help
+            exit 0
             ;;
-        -e|--errors)
-            ERROR_FILE="$2"  # Сохраняем путь для файла ошибок
-            shift 2  # Сдвигаем на 2 позиции (опция + значение)
+        l)
+            LOG_FILE="$OPTARG"
+            if ! check_path "$LOG_FILE"; then
+                exit 1
+            fi
             ;;
-        -h|--help)
-            show_help  # Выводим справку
-            exit 0     # Завершаем работу после вывода справки
+        e)
+            ERROR_FILE="$OPTARG"
+            if ! check_path "$ERROR_FILE"; then
+                exit 1
+            fi
             ;;
-        --)
-            shift  # Конец опций
-            break
+        -)
+            # Обработка длинных опций
+            case "${OPTARG}" in
+                users)
+                    SHOW_USERS=true
+                    ;;
+                processes)
+                    SHOW_PROCESSES=true
+                    ;;
+                help)
+                    show_help
+                    exit 0
+                    ;;
+                log)
+                    LOG_FILE="${!OPTIND}"
+                    OPTIND=$((OPTIND + 1))
+                    if ! check_path "$LOG_FILE"; then
+                        exit 1
+                    fi
+                    ;;
+                errors)
+                    ERROR_FILE="${!OPTIND}"
+                    OPTIND=$((OPTIND + 1))
+                    if ! check_path "$ERROR_FILE"; then
+                        exit 1
+                    fi
+                    ;;
+                *)
+                    echo "Неизвестная опция: --${OPTARG}" >&2
+                    show_help
+                    exit 1
+                    ;;
+            esac
             ;;
-        *)
-            echo "Internal error!" >&2
+        \?)
+            echo "Неизвестная опция: -$OPTARG" >&2
+            show_help
+            exit 1
+            ;;
+        :)
+            echo "Опция -$OPTARG требует аргумент" >&2
             exit 1
             ;;
     esac
 done
 
-# Перенаправление вывода ошибок (stderr) в файл
-if [[ -n "$ERROR_FILE" ]]; then
-    # Проверяем доступ к файлу ошибок
-    if check_file_access "$ERROR_FILE" "error"; then
-        # exec 2>> перенаправляет stderr в файл (>> для добавления)
-        exec 2>>"$ERROR_FILE"
-    else
-        exit 1  # Завершаем работу при ошибке доступа
-    fi
+# Настройка перенаправления вывода
+if [ -n "$LOG_FILE" ]; then
+    exec > "$LOG_FILE"
 fi
 
-# Перенаправление стандартного вывода (stdout) в файл
-if [[ -n "$LOG_FILE" ]]; then
-    # Проверяем доступ к лог-файлу
-    if check_file_access "$LOG_FILE" "log"; then
-        # exec 1>> перенаправляет stdout в файл (>> для добавления)
-        exec 1>>"$LOG_FILE"
-    else
-        exit 1  # Завершаем работу при ошибке доступа
-    fi
+# Настройка перенаправления ошибок
+if [ -n "$ERROR_FILE" ]; then
+    exec 2> "$ERROR_FILE"
+else
+    # Фильтрация stderr (пример: убираем некоторые системные сообщения)
+    exec 2> >(grep -v "Отказано в доступе\|Permission denied" >&2)
 fi
 
-# Выполнение команд в зависимости от установленных флагов
-
-# Если установлен флаг вывода пользователей
-if [[ $CMD_USERS -eq 1 ]]; then
-    echo "=== User list ==="
-    show_users  # Вызываем функцию показа пользователей
+# Выполнение запрошенных действий
+if [ "$SHOW_USERS" = true ]; then
+    echo "=== Список пользователей и их домашние директории ==="
+    show_users
 fi
 
-# Если установлен флаг вывода процессов
-if [[ $CMD_PROCESSES -eq 1 ]]; then
-    echo "=== Process list ==="
-    show_processes  # Вызываем функцию показа процессов
+if [ "$SHOW_PROCESSES" = true ]; then
+    echo "=== Список запущенных процессов (сортировка по PID) ==="
+    show_processes
 fi
 
-# Если не указано никаких действий (ни пользователи, ни процессы)
-if [[ $CMD_USERS -ne 1 && $CMD_PROCESSES -ne 1 ]]; then
-    echo "Действие не указано. Используйте -h для получения справки." >&2
+# Если не указано ни одного действия
+if [ "$SHOW_USERS" = false ] && [ "$SHOW_PROCESSES" = false ]; then
+    echo "Ошибка: Не указано действие. Используйте -u, -p или -h" >&2
+    show_help
     exit 1
 fi
+
+exit 0
