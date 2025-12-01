@@ -6,7 +6,6 @@ ERROR_FILE=""
 show_help() {
     cat << EOF
 Использование: $0 [ОПЦИИ]
-
 Опции:
     -u, --users         Вывести список пользователей и их домашние директории
     -p, --processes     Вывести список запущенных процессов по PID
@@ -14,11 +13,9 @@ show_help() {
     -l PATH, --log PATH Перенаправить вывод в файл PATH
     -e PATH, --errors PATH Перенаправить stderr в файл PATH
 }
-
 show_users() {
     awk -F: '{print $1 ":" $6}' /etc/passwd | sort
 }
-
 show_processes() {
     ps -eo pid,comm --sort=pid
 }
