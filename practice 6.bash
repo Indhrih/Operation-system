@@ -1,12 +1,8 @@
 #!/bin/bash
-
-# Переменные для хранения состояний
 SHOW_USERS=false
 SHOW_PROCESSES=false
 LOG_FILE=""
 ERROR_FILE=""
-
-# Функции для обработки действий
 show_help() {
     cat << EOF
 Использование: $0 [ОПЦИИ]
@@ -26,8 +22,6 @@ show_users() {
 show_processes() {
     ps -eo pid,comm --sort=pid
 }
-
-# Функция проверки доступности пути
 check_path() {
     local path="$1"
     local dir=$(dirname "$path")
@@ -44,8 +38,6 @@ check_path() {
     
     return 0
 }
-
-# Используем getopts для обработки коротких опций
 while getopts ":uphl:e:-:" opt; do
     case $opt in
         u)
@@ -71,7 +63,6 @@ while getopts ":uphl:e:-:" opt; do
             fi
             ;;
         -)
-            # Обработка длинных опций
             case "${OPTARG}" in
                 users)
                     SHOW_USERS=true
@@ -115,32 +106,23 @@ while getopts ":uphl:e:-:" opt; do
             ;;
     esac
 done
-
-# Настройка перенаправления вывода
 if [ -n "$LOG_FILE" ]; then
     exec > "$LOG_FILE"
 fi
-
-# Настройка перенаправления ошибок
 if [ -n "$ERROR_FILE" ]; then
     exec 2> "$ERROR_FILE"
 else
     # Фильтрация stderr (пример: убираем некоторые системные сообщения)
     exec 2> >(grep -v "Отказано в доступе\|Permission denied" >&2)
 fi
-
-# Выполнение запрошенных действий
 if [ "$SHOW_USERS" = true ]; then
     echo "=== Список пользователей и их домашние директории ==="
     show_users
 fi
-
 if [ "$SHOW_PROCESSES" = true ]; then
     echo "=== Список запущенных процессов (сортировка по PID) ==="
     show_processes
 fi
-
-# Если не указано ни одного действия
 if [ "$SHOW_USERS" = false ] && [ "$SHOW_PROCESSES" = false ]; then
     echo "Ошибка: Не указано действие. Используйте -u, -p или -h" >&2
     show_help
