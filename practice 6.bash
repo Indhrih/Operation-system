@@ -4,7 +4,7 @@ SHOW_PROCESSES=false
 LOG_FILE=""
 ERROR_FILE=""
 show_help() {
-    cat << EOF
+    echo *
 Использование: $0 [ОПЦИИ]
 Опции:
     -u, --users         Вывести список пользователей и их домашние директории
