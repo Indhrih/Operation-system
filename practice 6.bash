@@ -59,39 +59,6 @@ while getopts ":uphl:e:-:" opt; do
                 exit 1
             fi
             ;;
-        -)
-            case "${OPTARG}" in
-                users)
-                    SHOW_USERS=true
-                    ;;
-                processes)
-                    SHOW_PROCESSES=true
-                    ;;
-                help)
-                    show_help
-                    exit 0
-                    ;;
-                log)
-                    LOG_FILE="${!OPTIND}"
-                    OPTIND=$((OPTIND + 1))
-                    if ! check_path "$LOG_FILE"; then
-                        exit 1
-                    fi
-                    ;;
-                errors)
-                    ERROR_FILE="${!OPTIND}"
-                    OPTIND=$((OPTIND + 1))
-                    if ! check_path "$ERROR_FILE"; then
-                        exit 1
-                    fi
-                    ;;
-                *)
-                    echo "Неизвестная опция: --${OPTARG}" >&2
-                    show_help
-                    exit 1
-                    ;;
-            esac
-            ;;
         \?)
             echo "Неизвестная опция: -$OPTARG" >&2
             show_help
