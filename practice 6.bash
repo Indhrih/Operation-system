@@ -109,7 +109,7 @@ fi
 if [ -n "$ERROR_FILE" ]; then
     exec 2> "$ERROR_FILE"
 else
-    # Фильтрация stderr (пример: убираем некоторые системные сообщения)
+    # Фильтрация stderr
     exec 2> >(grep -v "Отказано в доступе\|Permission denied" >&2)
 fi
 if [ "$SHOW_USERS" = true ]; then
