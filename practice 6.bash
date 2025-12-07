@@ -14,10 +14,10 @@ show_help() {
     -e PATH, --errors PATH Перенаправить stderr в файл PATH
 }
 show_users() {
-    awk -F: '{print $1 ":" $6}' /etc/passwd | sort
+    cat /etc/passwd | cut -d ":" -f 1,6 | sort
 }
 show_processes() {
-    ps -eo pid,comm --sort=pid
+    ps -eo pid,comm --no-headers | sort -n
 }
 check_path() {
     local path="$1"
