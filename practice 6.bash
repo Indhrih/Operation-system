@@ -4,7 +4,7 @@ SHOW_PROCESSES=false
 LOG_FILE=""
 ERROR_FILE=""
 show_help() {
-    echo *
+    echo "
 Использование: $0 [ОПЦИИ]
 Опции:
     -u, --users         Вывести список пользователей и их домашние директории
@@ -12,6 +12,7 @@ show_help() {
     -h, --help          Показать эту справку и выйти
     -l PATH, --log PATH Перенаправить вывод в файл PATH
     -e PATH, --errors PATH Перенаправить stderr в файл PATH
+    "
 }
 
 show_users() {
@@ -36,74 +37,83 @@ check_path() {
     
     return 0
 }
-# Define options for getopt
-OPTIONS=uphl:e:
-LONGOPTS=users,processes,help,log:,errors:
+PARSED=$(getopt -o uphl:e: --long users,processes,help,log:,errors: -n "$0" -- "$@")
 
-# Parse command line arguments
-PARSED=`getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@"`
-
-# Check if parsing was successful
 if [ $? -ne 0 ]; then
+    echo "Ошибка разбора аргументов" >&2
     exit 1
 fi
 
-# Set parsed arguments
 eval set -- "$PARSED"
 
-# Process command line arguments
 while true; do
     case "$1" in
-        u)
+        -u|--users)
             SHOW_USERS=true
+            shift
             ;;
-        p)
+        -p|--processes)
             SHOW_PROCESSES=true
+            shift
             ;;
-        h)
+        -h|--help)
             show_help
             exit 0
             ;;
-        l)
-            LOG_FILE="$OPTARG"
+        -l|--log)
+            LOG_FILE="$2"
             if ! check_path "$LOG_FILE"; then
                 exit 1
             fi
+            shift 2
             ;;
-        e)
-            ERROR_FILE="$OPTARG"
+        -e|--errors)
+            ERROR_FILE="$2"
             if ! check_path "$ERROR_FILE"; then
                 exit 1
             fi
+            shift 2
             ;;
-        \?)
-            echo "Неизвестная опция: -$OPTARG" >&2
-            show_help
-            exit 1
+        --)
+            shift
+            break
             ;;
-        :)
-            echo "Опция -$OPTARG требует аргумент" >&2
+        *)
+            echo "Внутренняя ошибка" >&2
             exit 1
             ;;
     esac
 done
-if [ -n "$LOG_FILE" ]; then
-    exec > "$LOG_FILE"
-fi
+
+# Замещаем вывод ошибок из потока stderr в файл по заданному пути PATH
 if [ -n "$ERROR_FILE" ]; then
-    exec 2> "$ERROR_FILE"
+    if ! exec 2>"$ERROR_FILE"; then
+        echo "Ошибка: Не удалось перенаправить stderr в файл $ERROR_FILE" >&2
+        exit 1
+    fi
 else
-    # Фильтрация stderr
-    exec 2> >(grep -v "Отказано в доступе\|Permission denied" >&2)
+    # Фильтрация вывода в stderr используемых команд
+    exec 2> >(grep -v "Отказано в доступе\|Permission denied\|No such file or directory" >&2)
 fi
+
+# Замещаем вывод на экран выводом в файл по заданному пути PATH
+if [ -n "$LOG_FILE" ]; then
+    if ! exec 1>"$LOG_FILE"; then
+        echo "Ошибка: Не удалось перенаправить stdout в файл $LOG_FILE" >&2
+        exit 1
+    fi
+fi
+
+# Выполняем запрошенные действия
 if [ "$SHOW_USERS" = true ]; then
-    echo "=== Список пользователей и их домашние директории ==="
     show_users
 fi
+
 if [ "$SHOW_PROCESSES" = true ]; then
-    echo "=== Список запущенных процессов (сортировка по PID) ==="
     show_processes
 fi
+
+# Если не указано ни одного действия, выводим справку
 if [ "$SHOW_USERS" = false ] && [ "$SHOW_PROCESSES" = false ]; then
     echo "Ошибка: Не указано действие. Используйте -u, -p или -h" >&2
     show_help
