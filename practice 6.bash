@@ -36,8 +36,24 @@ check_path() {
     
     return 0
 }
-while getopts ":uphl:e:" opt; do
-    case "{$opt}" in
+# Define options for getopt
+OPTIONS=uphl:e:
+LONGOPTS=users,processes,help,log:,errors:
+
+# Parse command line arguments
+PARSED=`getopt --options=$OPTIONS --longoptions=$LONGOPTS --name "$0" -- "$@"`
+
+# Check if parsing was successful
+if [ $? -ne 0 ]; then
+    exit 1
+fi
+
+# Set parsed arguments
+eval set -- "$PARSED"
+
+# Process command line arguments
+while true; do
+    case "$1" in
         u)
             SHOW_USERS=true
             ;;
