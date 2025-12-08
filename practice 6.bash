@@ -13,6 +13,7 @@ show_help() {
     -l PATH, --log PATH Перенаправить вывод в файл PATH
     -e PATH, --errors PATH Перенаправить stderr в файл PATH
 }
+
 show_users() {
     cat /etc/passwd | cut -d ":" -f 1,6 | sort
 }
@@ -35,8 +36,8 @@ check_path() {
     
     return 0
 }
-while true; do
-    case "$1" in
+while getopts ":uphl:e:" opt; do
+    case "{$opt}" in
         u)
             SHOW_USERS=true
             ;;
